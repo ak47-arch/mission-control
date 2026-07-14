@@ -58,7 +58,7 @@ The backend has **zero mutating capability** — it never calls `pane send-text`
 
 - [`DESIGN.md`](../DESIGN.md) — architecture decisions, workspace layout, phase boundaries
 - [`MISSION_CONTROL_PRD.md`](../MISSION_CONTROL_PRD.md) — full product requirements, data sources, rules R1–R8
-- [`KNOWN_GAPS.md`](../KNOWN_GAPS.md) — tracked gaps (cost extraction, etc.)
+- [`KNOWN_GAPS.md`](../KNOWN_GAPS.md) — tracked gaps (cost extraction now fixed; remaining gaps: tests, CI, rules.rs, arc walk)
 
 ## Workspace Crates
 
@@ -93,7 +93,6 @@ All fields optional; `mc status` works with zero config. Also supports `herdr_so
 
 | Area | Source | Reason deferred |
 |---|---|---|
-| Cost extraction from pi usage records | `mc-core/src/collector/pi.rs` | Known gap: `total_cost_usd` always 0.0; `RawMessage` deserialization missing `usage` field (see `KNOWN_GAPS.md`) |
 | Tests beyond schema round-trips | `mc-schema/src/lib.rs` tests | Only serde round-trip tests exist. No reducer, collector, or transport tests yet |
 | GitHub Actions CI | `/.github/workflows/` | Only `openwiki-update.yml` exists; no build/test workflow |
 | `rules.rs` module | Referenced in `DESIGN.md` §1 | File does not exist; flag computation is inlined in `reducer.rs` |

@@ -15,6 +15,31 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
 
+// Usage data from pi assistant messages
+#[derive(Debug, Deserialize)]
+struct Usage {
+    input: Option<u64>,
+    output: Option<u64>,
+    #[serde(rename = "cacheRead")]
+    cache_read: Option<u64>,
+    #[serde(rename = "cacheWrite")]
+    cache_write: Option<u64>,
+    #[serde(rename = "totalTokens")]
+    total_tokens: Option<u64>,
+    cost: Option<Cost>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Cost {
+    input: Option<f64>,
+    output: Option<f64>,
+    #[serde(rename = "cacheRead")]
+    cache_read: Option<f64>,
+    #[serde(rename = "cacheWrite")]
+    cache_write: Option<f64>,
+    total: Option<f64>,
+}
+
 /// Read and parse a pi session `.jsonl` file into `PiSignals`.
 pub fn parse_session(path: &Path) -> Result<PiSignals, Error> {
     let contents = std::fs::read_to_string(path)
@@ -77,6 +102,7 @@ struct RawMessage {
     role: String,
     #[serde(default)]
     content: serde_json::Value,
+    usage: Option<Usage>,
 }
 
 // ── Build PiSignals from raw records ─────────────────────────────────
@@ -89,7 +115,9 @@ fn build_signals(session_path: &Path, records: &[RawRecord]) -> Result<PiSignals
     let mut thinking_level_accum: Option<ThinkingLevel> = None;
     let mut nodes: Vec<MessageNode> = Vec::new();
     let mut total_tool_calls: u32 = 0;
-    let total_cost_usd = 0.0_f64;
+    let mut total_cost_usd = 0.0_f64;
+    let mut cost_since_last_user = 0.0_f64;
+    let mut saw_user_since_cost_reset = false;
     let mut last_activity_at = chrono::Utc::now();
 
     let mut message_index = 0u64;
@@ -145,6 +173,26 @@ fn build_signals(session_path: &Path, records: &[RawRecord]) -> Result<PiSignals
                 // Parse content blocks
                 let content = parse_content(&message.content);
 
+                // Extract cost from assistant message usage
+                let mut message_cost = 0.0_f64;
+                if role == MessageRole::Assistant {
+                    if let Some(usage) = &message.usage {
+                        if let Some(cost) = &usage.cost {
+                            message_cost = cost.total.unwrap_or(0.0);
+                            total_cost_usd += message_cost;
+                            if saw_user_since_cost_reset {
+                                cost_since_last_user += message_cost;
+                            }
+                        }
+                    }
+                }
+
+                // Reset cost tracking on user message
+                if role == MessageRole::User {
+                    saw_user_since_cost_reset = true;
+                    cost_since_last_user = 0.0;
+                }
+
                 // Count tool calls
                 let tool_call_count = content
                     .iter()
@@ -199,7 +247,7 @@ fn build_signals(session_path: &Path, records: &[RawRecord]) -> Result<PiSignals
         last_user_message,
         deepest_leaf_since_last_user: deepest_leaf,
         tool_calls_since_last_user,
-        cost_since_last_user: 0.0, // TODO: compute from usage records
+        cost_since_last_user,
         error_since_last_user,
         last_activity_at,
     })

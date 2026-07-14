@@ -35,7 +35,7 @@ Reads pi `.jsonl` session files from each pane's `agent_session_path`. Parses th
 
 Known quirk: pi uses `"toolCall"` (camelCase) content blocks, handled explicitly in the parser.
 
-**Known gap**: Cost extraction is broken — `RawMessage` deserialization doesn't capture `usage`, so `total_cost_usd` is always `0.0`. See `KNOWN_GAPS.md`.
+Cost extraction: Fixed. `RawMessage` now deserializes `usage` (with `cost.total`), and `build_signals` accumulates `total_cost_usd` and `cost_since_last_user`. See `KNOWN_GAPS.md` for history.
 
 ### Collector 3: project scan (`mc-core/src/collector/project.rs`)
 
