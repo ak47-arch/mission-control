@@ -1,6 +1,6 @@
 # Mission Control — Architecture & Design Decisions
 
-**Status:** Phase 2 complete  — `mc status`, `mc serve`, `mc tui` implemented
+**Status:** Phase 3 complete — `mc status`, `mc serve`, `mc tui`, `mc web` implemented
 **Last updated:** 2026-07-14
 
 ---

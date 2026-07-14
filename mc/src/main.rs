@@ -8,6 +8,7 @@
 mod daemon;
 mod status;
 mod tui;
+mod web;
 
 use clap::{Parser, Subcommand};
 
@@ -26,6 +27,12 @@ enum Commands {
     Serve,
     /// Launch the TUI client
     Tui,
+    /// Start the web dashboard (HTTP + SSE)
+    Web {
+        /// Port to listen on (default: 9876)
+        #[arg(short, long, default_value = "9876")]
+        port: u16,
+    },
 }
 
 fn main() {
@@ -37,6 +44,13 @@ fn main() {
         Commands::Tui => {
             if let Err(e) = tui::run() {
                 eprintln!("mc: tui error: {e}");
+                std::process::exit(1);
+            }
+        }
+        Commands::Web { port } => {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            if let Err(e) = rt.block_on(web::run(port)) {
+                eprintln!("mc: web error: {e}");
                 std::process::exit(1);
             }
         }

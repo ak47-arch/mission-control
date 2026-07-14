@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mission Control</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --card-bg: #111118;
+    --border: #1a1a2e;
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --accent: #7c3aed;
+    --critical: #ef4444;
+    --high: #f59e0b;
+    --medium: #3b82f6;
+    --low: #22c55e;
+    --none: #6a6a78;
+    --working: #3b82f6;
+    --idle: #6a6a78;
+    --blocked: #ef4444;
+    --done: #22c55e;
+    --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  header .stats {
+    display: flex;
+    gap: 20px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  header .stats span { color: var(--text); font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .dot.working { background: var(--working); }
+  .dot.idle { background: var(--idle); }
+  .dot.blocked { background: var(--blocked); }
+
+  /* ── Layout ── */
+  main {
+    display: flex;
+    gap: 0;
+    height: calc(100vh - 61px);
+  }
+
+  /* ── Pane list ── */
+  .pane-list {
+    width: 380px;
+    min-width: 380px;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    background: var(--card-bg);
+  }
+  .pane-card {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+    border-left: 3px solid transparent;
+  }
+  .pane-card:hover { background: rgba(124, 58, 237, 0.06); }
+  .pane-card.selected {
+    background: rgba(124, 58, 237, 0.1);
+    border-left-color: var(--accent);
+  }
+  .pane-card.attention-critical { border-left-color: var(--critical); }
+  .pane-card.attention-high { border-left-color: var(--high); }
+  .pane-card.attention-medium { border-left-color: var(--medium); }
+  .pane-card.attention-low { border-left-color: var(--low); }
+
+  .pane-card .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .pane-card .pane-id {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .pane-card .status {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .status.working { background: rgba(59, 130, 246, 0.15); color: var(--working); }
+  .status.idle { background: rgba(106, 106, 120, 0.15); color: var(--idle); }
+  .status.blocked { background: rgba(239, 68, 68, 0.15); color: var(--blocked); }
+  .status.done { background: rgba(34, 197, 94, 0.15); color: var(--done); }
+
+  .pane-card .ask {
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+  .pane-card .meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 12px;
+  }
+  .pane-card .focused-star {
+    color: var(--accent);
+    font-size: 14px;
+  }
+
+  /* ── Detail panel ── */
+  .detail {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+  }
+  .detail .placeholder {
+    color: var(--text-dim);
+    text-align: center;
+    margin-top: 120px;
+    font-size: 14px;
+  }
+  .detail h2 {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    margin-bottom: 16px;
+    color: var(--text-dim);
+  }
+  .detail .vitals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .vital {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .vital label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .vital value {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  /* ── Conversation arc ── */
+  .conversation-arc h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+  .turn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+  }
+  .turn .turn-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .turn .turn-ask {
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .turn .turn-end {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+  }
+
+  /* ── Tool waterfall SVG ── */
+  .waterfall {
+    margin-top: 24px;
+  }
+  .waterfall h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+  .waterfall svg {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 100%;
+    height: auto;
+  }
+  .waterfall text {
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  /* ── Flags bar ── */
+  .flags-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .flag {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .flag.critical { background: rgba(239,68,68,0.15); color: var(--critical); }
+  .flag.high { background: rgba(245,158,11,0.15); color: var(--high); }
+  .flag.runaway { background: rgba(245,158,11,0.15); color: var(--high); }
+  .flag.blocked { background: rgba(239,68,68,0.15); color: var(--critical); }
+  .flag.awaiting { background: rgba(59,130,246,0.15); color: var(--medium); }
+
+  /* ── Error toast ── */
+  #error-toast {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: rgba(239,68,68,0.9);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    display: none;
+    z-index: 200;
+  }
+</style>
+<script defer>
+// ── API client ──────────────────────────────────────────────────
+const API = '/api';
+
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ── State ───────────────────────────────────────────────────────
+let state = { panes: [], totals: {}, selected: null };
+let eventSource = null;
+
+// ── Render ──────────────────────────────────────────────────────
+function render() {
+  renderHeader();
+  renderPaneList();
+  renderDetail();
+}
+
+function renderHeader() {
+  const t = state.totals;
+  document.getElementById('stat-total').textContent = t.pane_count || 0;
+  document.getElementById('stat-working').textContent = t.working_count || 0;
+  document.getElementById('stat-idle').textContent = t.idle_count || 0;
+  document.getElementById('stat-blocked').textContent = t.blocked_count || 0;
+  document.getElementById('stat-cost').textContent = (t.total_cost_usd || 0).toFixed(4);
+}
+
+function renderPaneList() {
+  const container = document.getElementById('pane-list');
+  container.innerHTML = state.panes.map(p => paneCardHTML(p)).join('');
+}
+
+function paneCardHTML(p) {
+  const attn = attentionClass(p);
+  const sel = state.selected === p.pane_id ? ' selected' : '';
+  const focus = p.focused ? '<span class="focused-star">★</span>' : '';
+  const status = (p.agent_status || 'unknown').toLowerCase();
+  const ask = p.last_user_message || '-';
+  const model = p.vitals?.model || '-';
+  const tools = p.vitals_since_last_user?.tool_calls || 0;
+  const proj = p.project?.name || '-';
+
+  return `
+    <div class="pane-card attention-${attn}${sel}" onclick="selectPane('${p.pane_id}')">
+      <div class="top-row">
+        <span class="pane-id">${focus} ${p.pane_id}</span>
+        <span class="status ${status}">${status}</span>
+      </div>
+      <div class="ask">${esc(ask)}</div>
+      <div class="meta">
+        <span>${proj}</span>
+        <span>${model}</span>
+        <span>${tools ? '+' + tools + 't' : ''}</span>
+        <span>$${(p.vitals?.total_cost_usd || 0).toFixed(4)}</span>
+      </div>
+    </div>`;
+}
+
+function attentionClass(p) {
+  switch (p.flags?.attention) {
+    case 'critical': return 'critical';
+    case 'high': return 'high';
+    case 'medium': return 'medium';
+    case 'low': return 'low';
+    default: return 'none';
+  }
+}
+
+function renderDetail() {
+  const container = document.getElementById('detail');
+  const pane = state.panes.find(p => p.pane_id === state.selected);
+  if (!pane) {
+    container.innerHTML = '<div class="placeholder">Select a pane to see details</div>';
+    return;
+  }
+
+  let flagsHTML = '';
+  if (pane.flags.is_blocked) flagsHTML += '<span class="flag blocked">BLOCKED</span>';
+  if (pane.flags.is_runaway) flagsHTML += '<span class="flag runaway">RUNAWAY</span>';
+  if (pane.flags.awaiting_user_reply) flagsHTML += '<span class="flag awaiting">AWAITS REPLY</span>';
+  if (pane.flags.idle_long_secs) flagsHTML += `<span class="flag">IDLE ${Math.floor(pane.flags.idle_long_secs/60)}m</span>`;
+
+  const v = pane.vitals || {};
+  const d = pane.vitals_since_last_user || {};
+
+  let turnsHTML = (pane.arc || []).map(t => {
+    let endHTML = '';
+    if (t.ended?.errored) {
+      endHTML = `<span class="turn-end" style="color:var(--critical)">⚠ ${esc(t.ended.errored.last_error_excerpt || 'error')}</span>`;
+    } else if (t.ended?.answered) {
+      endHTML = `<span class="turn-end" style="color:var(--low)">✓ ${esc(t.ended.answered.final_text_excerpt || 'done')}</span>`;
+    } else {
+      endHTML = `<span class="turn-end">… active</span>`;
+    }
+    return `<div class="turn">
+      <div class="turn-label">${t.turns_ago === 0 ? 'CURRENT' : t.turns_ago + ' TURNS AGO'}</div>
+      <div class="turn-ask">${esc(t.user || '-')}</div>
+      ${endHTML}
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <h2>${pane.pane_id} — ${pane.agent || 'unknown'}</h2>
+
+    <div class="flags-bar">${flagsHTML || '<span style="color:var(--text-dim)">no flags</span>'}</div>
+
+    <div class="vitals-grid">
+      <div class="vital"><label>Turns</label><value>${v.total_turns || 0}</value></div>
+      <div class="vital"><label>Tool Calls</label><value>${v.total_tool_calls || 0}</value></div>
+      <div class="vital"><label>Cost</label><value>$${(v.total_cost_usd || 0).toFixed(4)}</value></div>
+      <div class="vital"><label>Model</label><value style="font-size:13px">${esc(v.model || '-')}</value></div>
+      <div class="vital"><label>Since Last Ask</label><value>${d.tool_calls || 0}t / $${(d.cost_usd || 0).toFixed(4)}</value></div>
+      <div class="vital"><label>Age</label><value>${fmtDuration(v.session_age_secs || 0)}</value></div>
+      <div class="vital"><label>Thinking</label><value style="font-size:13px">${v.thinking_level || '-'}</value></div>
+      <div class="vital"><label>Focus</label><value>${pane.focused ? '★' : '-'}</value></div>
+    </div>
+
+    <div class="conversation-arc">
+      <h3>Conversation Arc</h3>
+      ${turnsHTML || '<p style="color:var(--text-dim)">no turns recorded</p>'}
+    </div>
+
+    ${pane.current?.kind !== 'user_pending' ? renderCurrent(pane) : ''}
+  `;
+}
+
+function renderCurrent(pane) {
+  const c = pane.current;
+  if (!c || !c.snippet) return '';
+  return `<div class="waterfall">
+    <h3>Current Activity — ${c.kind || 'unknown'}</h3>
+    <p style="color:var(--text-dim);margin-bottom:8px;font-size:13px;">${esc(c.snippet)}</p>
+    ${c.tool_name ? `<p style="font-size:11px;color:var(--accent);">tool: ${esc(c.tool_name)}</p>` : ''}
+  </div>`;
+}
+
+// ── Actions ─────────────────────────────────────────────────────
+function selectPane(id) {
+  state.selected = id;
+  render();
+}
+
+// ── Data loading ────────────────────────────────────────────────
+async function loadSnapshot() {
+  try {
+    const data = await fetchJSON(API + '/snapshot');
+    state.panes = data.panes || [];
+    state.totals = data.totals || {};
+    render();
+  } catch (e) {
+    showError('Failed to load: ' + e.message);
+  }
+}
+
+function connectSSE() {
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource(API + '/events');
+
+  eventSource.onmessage = (e) => {
+    try {
+      const ev = JSON.parse(e.data);
+      // Full refresh on any event — simplest approach
+      loadSnapshot();
+    } catch (_) {}
+  };
+
+  eventSource.onerror = () => {
+    // Reconnect after 3s
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+function showError(msg) {
+  const toast = document.getElementById('error-toast');
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => toast.style.display = 'none', 5000);
+}
+
+// ── Helpers ─────────────────────────────────────────────────────
+function esc(s) {
+  if (!s) return '';
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function fmtDuration(secs) {
+  if (secs < 60) return secs + 's';
+  if (secs < 3600) return Math.floor(secs / 60) + 'm';
+  if (secs < 86400) return Math.floor(secs / 3600) + 'h';
+  return Math.floor(secs / 86400) + 'd';
+}
+
+// ── Init ────────────────────────────────────────────────────────
+loadSnapshot();
+connectSSE();
+</script>
+</head>
+<body>
+<header>
+  <h1>🎯 Mission Control</h1>
+  <div class="stats">
+    <span><span class="dot working"></span> <span id="stat-working">-</span> working</span>
+    <span><span class="dot idle"></span> <span id="stat-idle">-</span> idle</span>
+    <span><span class="dot blocked"></span> <span id="stat-blocked">-</span> blocked</span>
+    <span style="margin-left:8px"><span id="stat-total">-</span> panes</span>
+    <span>$<span id="stat-cost">-</span></span>
+  </div>
+</header>
+
+<main>
+  <div class="pane-list" id="pane-list"></div>
+  <div class="detail" id="detail"></div>
+</main>
+
+<div id="error-toast"></div>
+</body>
+</html>

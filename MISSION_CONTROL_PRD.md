@@ -1,6 +1,6 @@
 # Mission Control — Product Requirements Document
 
-**Status:** draft v0.1 — planning phase
+**Status:** v0.1 — phases 0-3 implemented
 **Last updated:** 2026-07-14
 **Authors:** anupam + agent (chat session `019f5a2d-aac0-716d-add5-b9c4bca1f90c`)
 **Scope of this doc:** architecture and contracts. Visual designs and implementation come later.

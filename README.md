@@ -38,6 +38,7 @@ Three orthogonal data sources, one-way arrows, render-only backend. See `DESIGN.
 | `mc status` | Print the "needs-you" lane — all panes sorted by attention |
 | `mc serve` | Start the long-running daemon |
 | `mc tui` | Launch the ratatui dashboard |
+| `mc web` | Start the web dashboard (HTTP + SSE, default port 9876) |
 
 ## Requirements
 
