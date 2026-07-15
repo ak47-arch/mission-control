@@ -620,3 +620,20 @@ mod tests {
         assert!(matches!(blocks[0], ContentBlock::Text { .. }));
     }
 }
+#[cfg(test)]
+mod cost_tests_real {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_parse_real_session() {
+        let path = Path::new("/home/anupam/.pi/agent/sessions/--home-anupam-Desktop-workspace--/2026-07-14T16-48-14-355Z_019f6187-7213-78db-823a-bc954ce81de2.jsonl");
+        let signals = parse_session(path).unwrap();
+        println!("Session ID: {}", signals.session_id);
+        println!("Total cost: {}", signals.total_cost_usd);
+        println!("Cost since last user: {}", signals.cost_since_last_user);
+        println!("Total tool calls: {}", signals.total_tool_calls);
+        println!("Models: {:?}", signals.model);
+        println!("Thinking level: {:?}", signals.thinking_level);
+    }
+}
