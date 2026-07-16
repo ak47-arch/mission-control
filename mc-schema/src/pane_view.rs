@@ -16,7 +16,11 @@ pub struct PaneView {
     pub schema_version: u32,
     pub pane_id: String,
     pub workspace_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_name: Option<String>,
     pub tab_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tab_name: Option<String>,
     pub updated_at: DateTime<Utc>,
 
     // ── identity & location ──

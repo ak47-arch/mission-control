@@ -8,6 +8,7 @@ use interprocess::local_socket::GenericFilePath;
 use mc_schema::pane_view::AgentStatus;
 use mc_schema::raw_signals::HerdrPaneSnapshot;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -29,6 +30,40 @@ pub enum Error {
 
 /// Raw response from herdr's `pane.list` method.
 /// herdr wraps the result in `{"id":"...","result":{"panes":[...]}}`.
+#[derive(Debug, Deserialize)]
+struct WorkspaceListResponse {
+    result: WorkspaceListResult,
+}
+
+#[derive(Debug, Deserialize)]
+struct WorkspaceListResult {
+    workspaces: Vec<WorkspaceInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WorkspaceInfo {
+    workspace_id: String,
+    #[serde(default)]
+    label: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TabListResponse {
+    result: TabListResult,
+}
+
+#[derive(Debug, Deserialize)]
+struct TabListResult {
+    tabs: Vec<TabInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TabInfo {
+    tab_id: String,
+    #[serde(default)]
+    label: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct HerdrResponse {
     result: PaneListResult,
@@ -105,10 +140,34 @@ pub fn herdr_socket_path() -> Result<PathBuf, Error> {
         .join("herdr.sock"))
 }
 
-/// Fetch all panes from herdr.
+/// Fetch all panes from herdr, enriched with workspace/tab labels.
 pub fn fetch_panes(socket_path: &Path, timeout: Duration) -> Result<Vec<HerdrPaneSnapshot>, Error> {
     let mut stream = connect(&socket_path, timeout)?;
-    send_request(&mut stream, "mc-status")?;
+
+    // Fetch workspace labels
+    send_request(&mut stream, "mc-ws", "workspace.list")?;
+    let ws_response: WorkspaceListResponse = read_response(&mut stream)?;
+    let ws_labels: HashMap<String, String> = ws_response
+        .result
+        .workspaces
+        .into_iter()
+        .filter_map(|ws| ws.label.map(|l| (ws.workspace_id, l)))
+        .collect();
+
+    // Fetch tab labels
+    let mut stream = connect(&socket_path, timeout)?;
+    send_request(&mut stream, "mc-tab", "tab.list")?;
+    let tab_response: TabListResponse = read_response(&mut stream)?;
+    let tab_labels: HashMap<String, String> = tab_response
+        .result
+        .tabs
+        .into_iter()
+        .filter_map(|t| t.label.map(|l| (t.tab_id, l)))
+        .collect();
+
+    // Fetch panes
+    let mut stream = connect(&socket_path, timeout)?;
+    send_request(&mut stream, "mc-status", "pane.list")?;
     let response: HerdrResponse = read_response(&mut stream)?;
 
     let now = chrono::Utc::now();
@@ -117,8 +176,10 @@ pub fn fetch_panes(socket_path: &Path, timeout: Duration) -> Result<Vec<HerdrPan
         .panes
         .into_iter()
         .map(|p| HerdrPaneSnapshot {
-            workspace_id: p.workspace_id,
-            tab_id: p.tab_id,
+            workspace_id: p.workspace_id.clone(),
+            workspace_label: ws_labels.get(&p.workspace_id).cloned(),
+            tab_id: p.tab_id.clone(),
+            tab_label: tab_labels.get(&p.tab_id).cloned(),
             pane_id: p.pane_id,
             agent: p.agent,
             agent_status: p.agent_status.into(),
@@ -144,10 +205,10 @@ fn connect(path: &Path, timeout: Duration) -> std::io::Result<interprocess::loca
 }
 
 /// Send a JSON-RPC request to herdr (newline-delimited JSON).
-fn send_request(stream: &mut interprocess::local_socket::Stream, id: &str) -> Result<(), Error> {
+fn send_request(stream: &mut interprocess::local_socket::Stream, id: &str, method: &str) -> Result<(), Error> {
     let request = serde_json::json!({
         "id": id,
-        "method": "pane.list",
+        "method": method,
         "params": {},
     });
     stream.write_all(serde_json::to_string(&request)?.as_bytes())?;

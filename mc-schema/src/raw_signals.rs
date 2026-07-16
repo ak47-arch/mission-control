@@ -14,7 +14,11 @@ use uuid::Uuid;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HerdrPaneSnapshot {
     pub workspace_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_label: Option<String>,
     pub tab_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tab_label: Option<String>,
     pub pane_id: String,
     /// Agent kind, e.g. "pi"
     #[serde(default, skip_serializing_if = "Option::is_none")]

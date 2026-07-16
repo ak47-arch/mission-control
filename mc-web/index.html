@@ -316,11 +316,12 @@ function paneCardHTML(p) {
   const model = p.vitals?.model || '-';
   const tools = p.vitals_since_last_user?.tool_calls || 0;
   const proj = p.project?.name || '-';
+  const label = paneLabel(p);
 
   return `
     <div class="pane-card attention-${attn}${sel}" onclick="selectPane('${p.pane_id}')">
       <div class="top-row">
-        <span class="pane-id">${focus} ${p.pane_id}</span>
+        <span class="pane-id">${focus} ${label}</span>
         <span class="status ${status}">${status}</span>
       </div>
       <div class="ask">${esc(ask)}</div>
@@ -331,6 +332,13 @@ function paneCardHTML(p) {
         <span>$${(p.vitals?.total_cost_usd || 0).toFixed(4)}</span>
       </div>
     </div>`;
+}
+
+function paneLabel(p) {
+  if (p.workspace_name && p.tab_name) return esc(p.workspace_name) + ' / ' + esc(p.tab_name);
+  if (p.workspace_name) return esc(p.workspace_name);
+  if (p.tab_name) return esc(p.tab_name);
+  return p.pane_id;
 }
 
 function attentionClass(p) {
@@ -377,7 +385,7 @@ function renderDetail() {
   }).join('');
 
   container.innerHTML = `
-    <h2>${pane.pane_id} — ${pane.agent || 'unknown'}</h2>
+    <h2>${paneLabel(pane)} — ${pane.agent || 'unknown'}</h2>
 
     <div class="flags-bar">${flagsHTML || '<span style="color:var(--text-dim)">no flags</span>'}</div>
 
