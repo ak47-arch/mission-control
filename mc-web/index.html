@@ -327,6 +327,7 @@ function paneCardHTML(p) {
       <div class="ask">${esc(ask)}</div>
       <div class="meta">
         <span>${proj}</span>
+        <span title="${p.cwd || '-'}">${p.cwd ? esc(shortPath(p.cwd)) : proj}</span>
         <span>${model}</span>
         <span>${tools ? '+' + tools + 't' : ''}</span>
         <span>$${(p.vitals?.total_cost_usd || 0).toFixed(4)}</span>
@@ -339,6 +340,12 @@ function paneLabel(p) {
   if (p.workspace_name) return esc(p.workspace_name);
   if (p.tab_name) return esc(p.tab_name);
   return p.pane_id;
+}
+
+function shortPath(path) {
+  const parts = path.split('/').filter(Boolean);
+  if (parts.length <= 2) return path;
+  return '…/' + parts.slice(-2).join('/');
 }
 
 function attentionClass(p) {
@@ -398,6 +405,7 @@ function renderDetail() {
       <div class="vital"><label>Age</label><value>${fmtDuration(v.session_age_secs || 0)}</value></div>
       <div class="vital"><label>Thinking</label><value style="font-size:13px">${v.thinking_level || '-'}</value></div>
       <div class="vital"><label>Focus</label><value>${pane.focused ? '★' : '-'}</value></div>
+      <div class="vital"><label>CWD</label><value style="font-size:13px">${esc(pane.cwd || '-')}</value></div>
     </div>
 
     <div class="conversation-arc">

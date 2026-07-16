@@ -113,6 +113,7 @@ fn build_pane_view(
         agent: h.agent.clone(),
         agent_status: h.agent_status,
         focused: h.focused,
+        cwd: Some(h.cwd.clone()),
         session_id: pi.map(|p| p.session_id),
         session_path: pi.map(|p| p.session_path.clone()),
         project,

@@ -29,6 +29,8 @@ pub struct PaneView {
     pub agent_status: AgentStatus,
     pub focused: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_path: Option<PathBuf>,
