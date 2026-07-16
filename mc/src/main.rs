@@ -6,6 +6,7 @@
 //!   tui        Launch the TUI client (Phase 2)
 
 mod daemon;
+mod diagnose;
 mod status;
 mod tui;
 mod web;
@@ -23,6 +24,8 @@ struct Cli {
 enum Commands {
     /// Print the "needs-you" lane — all panes sorted by attention
     Status,
+    /// Diagnose session-to-pane mapping and orphaned sessions
+    Diagnose,
     /// Start the Mission Control daemon
     Serve,
     /// Launch the TUI client
@@ -40,6 +43,7 @@ fn main() {
 
     match cli.command {
         Commands::Status => status::run(),
+        Commands::Diagnose => diagnose::run(),
         Commands::Serve => daemon::run(),
         Commands::Tui => {
             if let Err(e) = tui::run() {
