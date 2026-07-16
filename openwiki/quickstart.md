@@ -66,7 +66,8 @@ The backend has **zero mutating capability** — it never calls `pane send-text`
 
 - [`DESIGN.md`](../DESIGN.md) — architecture decisions, workspace layout, phase boundaries
 - [`MISSION_CONTROL_PRD.md`](../MISSION_CONTROL_PRD.md) — full product requirements, data sources, rules R1–R8
-- [`KNOWN_GAPS.md`](../KNOWN_GAPS.md) — tracked gaps (cost extraction now fixed; remaining gaps: tests, CI, rules.rs, arc walk)
+- [`PRD_SESSION_POLLING.md`](../PRD_SESSION_POLLING.md) — session polling optimization PRD (documented, not implemented)
+- [`KNOWN_GAPS.md`](../KNOWN_GAPS.md) — tracked gaps (cost extraction now fixed; orphaned-session fallback fixed; remaining gaps: tests, CI, rules.rs, arc walk)
 
 ## Workspace Crates
 
@@ -83,6 +84,7 @@ The backend has **zero mutating capability** — it never calls `pane send-text`
 - **Attention** — Five-level urgency enum (`None`, `Low`, `Medium`, `High`, `Critical`) that drives the "needs-you" lane sorting.
 - **Flags** — Computed state: `is_blocked`, `is_runaway`, `awaiting_user_reply` (bools), `idle_long_secs` (`Option<u64>`), and `attention` (the 5-level urgency enum).
 - **Three-source join** — herdr pane list (`HerdrPaneSnapshot`) → pi session (`PiSignals` via `agent_session_path`) + project scan (`ProjectProfile` via `cwd`).
+- **Orphaned-session fallback** — when herdr's pi extension loses the session path after reattach cycles, the herdr collector now derives the session path from `cwd` by scanning `~/.pi/agent/sessions/`.
 - **StateStore** — `Arc<Mutex<ring + seq>>` mirroring herdr's `EventHub` pattern. Bounded to 512 events.
 
 ## Configuration

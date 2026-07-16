@@ -38,6 +38,7 @@ The canonical per-pane state. Every client consumes this.
 | Location | `agent` | `String` (e.g. `"pi"`) |
 | | `agent_status` | `AgentStatus` |
 | | `focused` | `bool` |
+| | `cwd` | `Option<PathBuf>` — working directory of the pane |
 | | `session_id` | `Option<Uuid>` |
 | | `session_path` | `Option<PathBuf>` |
 | Project | `project` | `Option<ProjectView>` |

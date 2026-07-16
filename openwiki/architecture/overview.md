@@ -125,6 +125,8 @@ One-shot mode. Runs all three collectors inline, reduces, prints the "needs-you"
 ### `mc serve` (`mc/src/daemon.rs`)
 Long-running daemon. Polls collectors at 1s intervals, reduces, diffs against previous state, emits events into `StateStore`, serves JSON-RPC over Unix socket.
 
+**Note:** The daemon currently polls pi sessions by reading entire `.jsonl` files on every iteration (see [PRD_SESSION_POLLING.md](../PRD_SESSION_POLLING.md) for optimization proposal).
+
 ### `mc tui` (`mc/src/tui.rs`)
 ratatui terminal dashboard. Connects to daemon socket, polls `mc.snapshot` every 1s. Renders:
 - Header bar: pane counts (total/working/idle/blocked) + total cost
@@ -133,7 +135,7 @@ ratatui terminal dashboard. Connects to daemon socket, polls `mc.snapshot` every
 ### `mc web` (`mc/src/web.rs`)
 Axum HTTP + SSE bridge. Serves the static dashboard at `mc-web/index.html`, provides JSON API endpoints mirroring the daemon's RPC methods, and maintains an SSE stream for live updates on port 9876.
 
-The web dashboard now displays **workspace/tab labels** (from `workspace_name` and `tab_name` in `PaneView`) instead of raw IDs in the pane list and detail view.
+The web dashboard now displays **workspace/tab labels** (from `workspace_name` and `tab_name` in `PaneView`) instead of raw IDs in the pane list and detail view. It also shows the **pane's `cwd`** in both the pane card and detail view.
 
 ### `mc diagnose` (`mc/src/diagnose.rs`)
 Inspects session-to-pane mapping and orphaned sessions. Connects to the daemon, fetches the pane list, scans the pi session directory, and reports:
@@ -162,6 +164,8 @@ Also supports a `herdr_socket` override in config (defaults to `$HERDR_SOCKET_PA
 |---|---|---|
 | 0-2 | `44a650e` | Schema crate, collectors, reducer, state store, config, transport, TUI, daemon, status |
 | 3 | `dba6517` | Web dashboard: `mc-web/index.html`, `mc/src/web.rs`, Axum SSE bridge |
+| 3.1 | `d5d8818` | Expose `cwd` in `PaneView` and web UI; orphaned-session fallback in herdr collector |
+| — | `3f68998` | Added `PRD_SESSION_POLLING.md` (documented, not implemented) |
 
 ## Design Decisions
 
