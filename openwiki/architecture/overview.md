@@ -1,3 +1,10 @@
+---
+type: Reference
+title: Architecture Overview
+description: Mission Control architecture, data pipeline, collectors, reducer, state store, transport, and CLI subcommands
+tags: [architecture, overview, pipeline, collectors, reducer, transport]
+---
+
 # Architecture Overview
 
 Mission Control is a read-only dashboard that collects signals from three independent sources, reduces them into a unified per-pane state, and presents the result through TUI, web, and one-shot CLI views.
@@ -20,10 +27,11 @@ The system implements **R1** from the PRD: collectors emit internal-only signal 
 
 ### Collector 1: herdr (`mc-core/src/collector/herdr.rs`)
 
-Connects to herdr's JSON-RPC Unix socket at `$HERDR_SOCKET_PATH`. Calls `pane.list` and maps herdr's wire schema into `HerdrPaneSnapshot` — capturing pane identity (workspace/tab/pane IDs), agent name, focus state, `cwd`, and the critical `agent_session_path` bridge field.
+Connects to herdr's JSON-RPC Unix socket at `$HERDR_SOCKET_PATH`. Calls `pane.list`, `workspace.list`, and `tab.list` to map herdr's wire schema into `HerdrPaneSnapshot` — capturing pane identity (workspace/tab/pane IDs, **workspace/tab labels**), agent name, focus state, `cwd`, and the critical `agent_session_path` bridge field.
 
 - **Poll frequency**: 1s in daemon mode
 - **Error handling**: returns empty vec if herdr is unreachable
+- **Orphaned session fallback**: When `agent_session_path` is `None` for pi panes, the collector scans `~/.pi/agent/sessions/` for `.jsonl` files matching the pane's `cwd` (first by slug, then by scanning all session headers). This recovers session data for panes where herdr's pi extension lost the session path after reattach cycles.
 
 ### Collector 2: pi sessions (`mc-core/src/collector/pi.rs`)
 
@@ -124,6 +132,17 @@ ratatui terminal dashboard. Connects to daemon socket, polls `mc.snapshot` every
 
 ### `mc web` (`mc/src/web.rs`)
 Axum HTTP + SSE bridge. Serves the static dashboard at `mc-web/index.html`, provides JSON API endpoints mirroring the daemon's RPC methods, and maintains an SSE stream for live updates on port 9876.
+
+The web dashboard now displays **workspace/tab labels** (from `workspace_name` and `tab_name` in `PaneView`) instead of raw IDs in the pane list and detail view.
+
+### `mc diagnose` (`mc/src/diagnose.rs`)
+Inspects session-to-pane mapping and orphaned sessions. Connects to the daemon, fetches the pane list, scans the pi session directory, and reports:
+- Panes with/without session data
+- Mapped vs orphaned session files on disk
+- Total cost across tracked panes
+- Recommendations for recovering orphaned sessions
+
+This is critical for debugging the orphaned session fallback in the herdr collector.
 
 ## Configuration (`mc-core/src/config.rs`)
 

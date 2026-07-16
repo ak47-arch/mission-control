@@ -1,3 +1,10 @@
+---
+type: Reference
+title: Domain Types — mc-schema
+description: The mc-schema crate types including PaneView, Flags, Attention, events, raw signals, and project types
+tags: [domain, schema, types, pane-view, flags, attention, events, project]
+---
+
 # Domain Types — `mc-schema`
 
 The `mc-schema` crate is the "frozen keel" of Mission Control. It contains all data types, depends on nothing except `serde`, `schemars`, `chrono`, and `uuid`, and is consumed by both the backend (`mc-core`) and all clients (`mc tui`, `mc web`).
@@ -25,6 +32,8 @@ The canonical per-pane state. Every client consumes this.
 | | `pane_id` | `String` |
 | | `workspace_id` | `String` |
 | | `tab_id` | `String` |
+| | `workspace_name` | `Option<String>` — human-readable label from herdr |
+| | `tab_name` | `Option<String>` — human-readable label from herdr |
 | | `updated_at` | `DateTime<Utc>` |
 | Location | `agent` | `String` (e.g. `"pi"`) |
 | | `agent_status` | `AgentStatus` |

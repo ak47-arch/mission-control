@@ -39,6 +39,7 @@ Three orthogonal data sources, one-way arrows, render-only backend. See `DESIGN.
 | `mc serve` | Start the long-running daemon |
 | `mc tui` | Launch the ratatui dashboard |
 | `mc web` | Start the web dashboard (HTTP + SSE, default port 9876) |
+| `mc diagnose` | Session mapping analysis — reports pane-to-session mapping, orphaned session files |
 
 ## Requirements
 

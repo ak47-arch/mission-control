@@ -1,3 +1,10 @@
+---
+type: Reference
+title: Mission Control — Quickstart
+description: Mission Control (mc) quickstart guide, subcommands, architecture overview, configuration, and documentation map
+tags: [quickstart, overview, subcommands, configuration, architecture]
+---
+
 # Mission Control — Quickstart
 
 **Mission Control** (`mc`) is a read-only birds-eye view over your collection of running coding-agent panes. It collects signals from three orthogonal sources — the herdr terminal workspace manager, pi session logs, and filesystem project scans — reduces them into per-pane semantic views, and renders dashboards via TUI, web, or CLI table. It does **not** send commands to agents, spawn panes, or route messages.
@@ -31,6 +38,7 @@ cargo run -- web
 | `mc serve` | Long-running daemon: polls herdr, tails pi sessions, reduces, serves JSON-RPC over Unix socket |
 | `mc tui` | ratatui terminal dashboard; connects to the daemon, polls `mc.snapshot` every 1s |
 | `mc web` | Axum HTTP + SSE bridge to the daemon; serves the browser dashboard at `:9876` |
+| `mc diagnose` | Inspects session-to-pane mapping and orphaned sessions; connects to daemon and scans pi session directory |
 
 ## Requirements
 
@@ -97,3 +105,7 @@ All fields optional; `mc status` works with zero config. Also supports `herdr_so
 | GitHub Actions CI | `/.github/workflows/` | Only `openwiki-update.yml` exists; no build/test workflow |
 | `rules.rs` module | Referenced in `DESIGN.md` §1 | File does not exist; flag computation is inlined in `reducer.rs` |
 | Conversation arc per-turn independent walk | `mc-core/src/reducer.rs:164` (`build_arc`) | TODO comment: currently marks all historical turns as "active"; should walk each subtree independently |
+
+**Fixed since last update:**
+- Cost extraction from pi usage records — `mc-core/src/collector/pi.rs` now deserializes `usage.cost.total`
+- Session mapping for orphaned panes — `mc-core/src/collector/herdr.rs` has fallback scan for pi session files by cwd

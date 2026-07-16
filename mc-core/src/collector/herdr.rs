@@ -8,7 +8,9 @@ use interprocess::local_socket::GenericFilePath;
 use mc_schema::pane_view::AgentStatus;
 use mc_schema::raw_signals::HerdrPaneSnapshot;
 use serde::Deserialize;
+use serde_json::Value;
 use std::collections::HashMap;
+use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -175,19 +177,36 @@ pub fn fetch_panes(socket_path: &Path, timeout: Duration) -> Result<Vec<HerdrPan
         .result
         .panes
         .into_iter()
-        .map(|p| HerdrPaneSnapshot {
-            workspace_id: p.workspace_id.clone(),
-            workspace_label: ws_labels.get(&p.workspace_id).cloned(),
-            tab_id: p.tab_id.clone(),
-            tab_label: tab_labels.get(&p.tab_id).cloned(),
-            pane_id: p.pane_id,
-            agent: p.agent,
-            agent_status: p.agent_status.into(),
-            focused: p.focused,
-            cwd: p.cwd.unwrap_or_else(|| ".".into()).into(),
-            agent_session_path: p.agent_session.map(|s| PathBuf::from(s.value)),
-            custom_status: p.custom_status,
-            captured_at: now,
+        .map(|p| {
+            let cwd = p.cwd.unwrap_or_else(|| ".".into());
+            let agent_session_path = p.agent_session.map(|s| PathBuf::from(s.value));
+
+            // Fallback: if pi is running but herdr lost the session path,
+            // scan the session directory by cwd and pick the newest file.
+            let agent_session_path = if agent_session_path.is_none()
+                && p.agent.as_deref() == Some("pi")
+                && cwd != "."
+            {
+                find_orphaned_session_path(&cwd)
+                    .or_else(|| find_orphaned_session_path_by_header(&cwd))
+            } else {
+                agent_session_path
+            };
+
+            HerdrPaneSnapshot {
+                workspace_id: p.workspace_id.clone(),
+                workspace_label: ws_labels.get(&p.workspace_id).cloned(),
+                tab_id: p.tab_id.clone(),
+                tab_label: tab_labels.get(&p.tab_id).cloned(),
+                pane_id: p.pane_id,
+                agent: p.agent,
+                agent_status: p.agent_status.into(),
+                focused: p.focused,
+                cwd: cwd.into(),
+                agent_session_path,
+                custom_status: p.custom_status,
+                captured_at: now,
+            }
         })
         .collect();
 
@@ -228,4 +247,114 @@ fn read_response<T: serde::de::DeserializeOwned>(
         return Err(Error::UnexpectedResponse);
     }
     serde_json::from_str(&line).map_err(Error::Json)
+}
+
+// ── Pi session directory helpers ──────────────────────────────────────────
+
+/// Pi's session directory (default: ~/.pi/agent/sessions/).
+fn pi_sessions_dir() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".pi")
+        .join("agent")
+        .join("sessions")
+}
+
+/// Convert a cwd path to pi's session directory slug.
+/// E.g. `/home/anupam/Desktop/workspace` → `--home-anupam-Desktop-workspace--`
+fn cwd_to_slug(cwd: &str) -> String {
+    let slug = cwd.trim_start_matches('/').replace('/', "-");
+    if slug.is_empty() {
+        return "--root--".to_string();
+    }
+    format!("--{}--", slug)
+}
+
+/// Find the newest `.jsonl` session file in the directory for the given cwd.
+/// Matches by directory slug derived from the cwd path, then verifies the
+/// session header `cwd` field matches.
+pub fn find_orphaned_session_path(cwd: &str) -> Option<PathBuf> {
+    let session_dir = pi_sessions_dir().join(cwd_to_slug(cwd));
+    let candidate = find_newest_jsonl(&session_dir)?;
+
+    // Verify the session header cwd matches
+    let content = fs::read_to_string(&candidate).ok()?;
+    let first_line = content.lines().next()?;
+    let val: Value = serde_json::from_str(first_line).ok()?;
+    if val.get("cwd").and_then(|v| v.as_str()) == Some(cwd) {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
+/// Fallback: scan ALL session directories for a session whose header `cwd`
+/// matches the given cwd. This catches cases where the slug algorithm doesn't
+/// exactly match pi's internal slug generation.
+pub fn find_orphaned_session_path_by_header(cwd: &str) -> Option<PathBuf> {
+    let sessions_dir = pi_sessions_dir();
+    let dir = match fs::read_dir(&sessions_dir) {
+        Ok(d) => d,
+        Err(_) => return None,
+    };
+
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    for entry in dir.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        if let Some(newest) = find_newest_jsonl(&path) {
+            // Read the first line to check the cwd header
+            if let Ok(content) = fs::read_to_string(&newest) {
+                if let Some(first_line) = content.lines().next() {
+                    if let Ok(val) = serde_json::from_str::<Value>(first_line) {
+                        if val.get("cwd").and_then(|v| v.as_str()) == Some(cwd) {
+                            candidates.push(newest);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Pick the newest by modification time
+    candidates.sort_by(|a, b| {
+        let mta = fs::metadata(a).and_then(|m| m.modified()).ok();
+        let mtb = fs::metadata(b).and_then(|m| m.modified()).ok();
+        mta.cmp(&mtb).reverse()
+    });
+
+    candidates.into_iter().next()
+}
+
+/// Find the newest `.jsonl` file in a directory.
+fn find_newest_jsonl(dir: &Path) -> Option<PathBuf> {
+    let read_dir = match fs::read_dir(dir) {
+        Ok(d) => d,
+        Err(_) => return None,
+    };
+
+    let mut newest: Option<PathBuf> = None;
+    let mut newest_mtime: Option<std::time::SystemTime> = None;
+
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+            continue;
+        }
+        if let Ok(meta) = fs::metadata(&path) {
+            if meta.len() == 0 {
+                continue; // skip files being written to
+            }
+            if let Ok(mtime) = meta.modified() {
+                if newest_mtime.map_or(true, |old| mtime > old) {
+                    newest = Some(path);
+                    newest_mtime = Some(mtime);
+                }
+            }
+        }
+    }
+
+    newest
 }
